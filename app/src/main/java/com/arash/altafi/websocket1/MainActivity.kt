@@ -6,9 +6,11 @@ import android.os.Bundle
 import android.util.Log
 import com.arash.altafi.websocket1.databinding.ActivityMainBinding
 import com.arash.altafi.websocket1.model.ResponseGson
+import com.arash.altafi.websocket1.model.ResponseMoshi
 import com.arash.altafi.websocket1.utils.WebSocketClient
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
 
 class MainActivity : AppCompatActivity() {
@@ -27,7 +29,7 @@ class MainActivity : AppCompatActivity() {
         init()
     }
 
-    private fun init() {
+    private fun init() = binding.apply {
         webSocket = WebSocketClient(WEB_SOCKET_URL) { message, isSuccess ->
             runOnUiThread {
                 // Update textview with incoming message
@@ -39,22 +41,21 @@ class MainActivity : AppCompatActivity() {
             }
         }
         webSocket?.connect()
-        sendMessage(webSocket)
-    }
 
-    private fun sendMessage(webSocket: WebSocketClient?) {
-        webSocket?.send(
-            "{\n" +
-                    "  \"event\": \"bts:subscribe\",\n" +
-                    "  \"data\": {\n" +
-                    "    \"channel\": \"live_trades_btcusd\"\n" +
-                    "  }\n" +
-                    "}"
-        )
+        btnSend.setOnClickListener {
+            webSocket?.send(
+                "{\n" +
+                        "  \"event\": \"bts:subscribe\",\n" +
+                        "  \"data\": {\n" +
+                        "    \"channel\": \"live_trades_btcusd\"\n" +
+                        "  }\n" +
+                        "}"
+            )
+        }
     }
 
     @SuppressLint("SetTextI18n")
-    private fun setUpBtcPriceText(message: String?) {
+    private fun setUpBtcPriceText(message: String?) = binding.apply {
         message?.let {
             //Moshi
 //            val adapter: JsonAdapter<ResponseMoshi> = moshi.adapter(ResponseMoshi::class.java)
@@ -66,16 +67,27 @@ class MainActivity : AppCompatActivity() {
 
             //show in ui
             runOnUiThread {
-//                binding.tvBtc.text = "1 BTC: ${bitcoinMoshi?.data?.price}"
-                binding.tvBtc.text = "1 BTC: ${bitcoinGson?.data?.price}"
+                /*bitcoinMoshi?.data?.price?.let { price ->
+                    tvBtc.text = "1 BTC: $price"
+                } ?: kotlin.run {
+                    tvBtc.text = "wait to receive response"
+                }*/
+
+                bitcoinGson?.data?.price?.let { price ->
+                    tvBtc.text = "1 BTC: $price"
+                } ?: kotlin.run {
+                    tvBtc.text = "wait to receive response"
+                }
+                chkStatus.isChecked = true
             }
         }
     }
 
     @SuppressLint("SetTextI18n")
-    private fun showErrorMessage(message: String?) {
+    private fun showErrorMessage(message: String?) = binding.apply {
         runOnUiThread {
-            binding.tvBtc.text = "Failure: $message"
+            tvBtc.text = "Failure: $message"
+            chkStatus.isChecked = false
         }
     }
 
