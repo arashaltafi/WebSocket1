@@ -4,77 +4,51 @@ import android.annotation.SuppressLint
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
-import android.widget.TextView
-import com.squareup.moshi.JsonAdapter
+import com.arash.altafi.websocket1.databinding.ActivityMainBinding
+import com.arash.altafi.websocket1.model.ResponseGson
+import com.arash.altafi.websocket1.utils.WebSocketClient
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import com.squareup.moshi.Moshi
-import org.java_websocket.client.WebSocketClient
-import org.java_websocket.handshake.ServerHandshake
-import java.lang.Exception
-import java.net.URI
-import javax.net.ssl.SSLSocketFactory
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var webSocketClient: WebSocketClient
-    private lateinit var tvPrice: TextView
+    private val binding by lazy {
+        ActivityMainBinding.inflate(layoutInflater)
+    }
+    private var webSocket: WebSocketClient? = null
+    private val moshi = Moshi.Builder().build()
+    private val gson = Gson()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        setContentView(binding.root)
 
-        tvPrice = findViewById(R.id.tvBtc)
+        init()
     }
 
-    override fun onResume() {
-        super.onResume()
-        initWebSocket()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        webSocketClient.close()
-    }
-
-    private fun initWebSocket() {
-        val coinbaseUri = URI(WEB_SOCKET_URL)
-
-        createWebSocketClient(coinbaseUri)
-
-        val socketFactory: SSLSocketFactory = SSLSocketFactory.getDefault() as SSLSocketFactory
-        webSocketClient.setSocketFactory(socketFactory)
-        webSocketClient.connect()
-    }
-
-    private fun createWebSocketClient(coinbaseUri: URI?) {
-        webSocketClient = object : WebSocketClient(coinbaseUri) {
-
-            override fun onOpen(handshakedata: ServerHandshake?) {
-                Log.d(TAG, "onOpen")
-                subscribe()
+    private fun init() {
+        webSocket = WebSocketClient(WEB_SOCKET_URL) { message, isSuccess ->
+            runOnUiThread {
+                // Update textview with incoming message
+                if (isSuccess)
+                    setUpBtcPriceText(message)
+                else
+                    showErrorMessage(message)
+                Log.i(TAG, "message: $message")
             }
-
-            override fun onMessage(message: String?) {
-                Log.d(TAG, "onMessage: $message")
-                setUpBtcPriceText(message)
-            }
-
-            override fun onClose(code: Int, reason: String?, remote: Boolean) {
-                Log.d(TAG, "onClose")
-                unsubscribe()
-            }
-
-            override fun onError(ex: Exception?) {
-                Log.e(TAG, "onError: ${ex?.message}")
-            }
-
         }
+        webSocket?.connect()
+        sendMessage(webSocket)
     }
 
-    private fun subscribe() {
-        webSocketClient.send(
+    private fun sendMessage(webSocket: WebSocketClient?) {
+        webSocket?.send(
             "{\n" +
-                    "    \"type\": \"subscribe\",\n" +
-                    "    \"channels\": [{ \"name\": \"ticker\", \"product_ids\": [\"BTC-EUR\"] }]\n" +
+                    "  \"event\": \"bts:subscribe\",\n" +
+                    "  \"data\": {\n" +
+                    "    \"channel\": \"live_trades_btcusd\"\n" +
+                    "  }\n" +
                     "}"
         )
     }
@@ -82,26 +56,37 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetTextI18n")
     private fun setUpBtcPriceText(message: String?) {
         message?.let {
-            val moshi = Moshi.Builder().build()
-            val adapter: JsonAdapter<BitcoinTicker> = moshi.adapter(BitcoinTicker::class.java)
-            val bitcoin = adapter.fromJson(message)
-            Log.i(TAG, "bitcoin = ${bitcoin?.price}")
-            runOnUiThread { tvPrice.text = "1 BTC: ${bitcoin?.price} €" }
+            //Moshi
+//            val adapter: JsonAdapter<ResponseMoshi> = moshi.adapter(ResponseMoshi::class.java)
+//            val bitcoinMoshi = adapter.fromJson(message)
+
+            //Gson
+            val bitcoinGson =
+                gson.fromJson<ResponseGson>(message, object : TypeToken<ResponseGson>() {}.type)
+
+            //show in ui
+            runOnUiThread {
+//                binding.tvBtc.text = "1 BTC: ${bitcoinMoshi?.data?.price}"
+                binding.tvBtc.text = "1 BTC: ${bitcoinGson?.data?.price}"
+            }
         }
     }
 
-    private fun unsubscribe() {
-        webSocketClient.send(
-            "{\n" +
-                    "    \"type\": \"unsubscribe\",\n" +
-                    "    \"channels\": [\"ticker\"]\n" +
-                    "}"
-        )
+    @SuppressLint("SetTextI18n")
+    private fun showErrorMessage(message: String?) {
+        runOnUiThread {
+            binding.tvBtc.text = "Failure: $message"
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        webSocket?.disconnect()
     }
 
     companion object {
-        const val WEB_SOCKET_URL = "wss://ws-feed.pro.coinbase.com"
-        const val TAG = "Coinbase"
+        const val WEB_SOCKET_URL = "wss://ws.bitstamp.net"
+        const val TAG = "WebSocketClient"
     }
 
 }
