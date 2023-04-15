@@ -6,11 +6,9 @@ import android.os.Bundle
 import android.util.Log
 import com.arash.altafi.websocket1.databinding.ActivityMainBinding
 import com.arash.altafi.websocket1.model.ResponseGson
-import com.arash.altafi.websocket1.model.ResponseMoshi
 import com.arash.altafi.websocket1.utils.WebSocketClient
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Moshi
 
 class MainActivity : AppCompatActivity() {
@@ -30,13 +28,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun init() = binding.apply {
-        webSocket = WebSocketClient(WEB_SOCKET_URL) { message, isSuccess ->
+        webSocket = WebSocketClient(WEB_SOCKET_URL) { message, status ->
             runOnUiThread {
-                // Update textview with incoming message
-                if (isSuccess)
-                    setUpBtcPriceText(message)
-                else
-                    showErrorMessage(message)
+                when (status) {
+                    WebSocketClient.STATUS.FAILED -> {
+                        showErrorMessage(message)
+                    }
+                    WebSocketClient.STATUS.MESSAGING -> {
+                        setUpBtcPriceText(message)
+                    }
+                    WebSocketClient.STATUS.CONNECTED -> {
+                        showConnectMessage(message)
+                    }
+                }
                 Log.i(TAG, "message: $message")
             }
         }
@@ -80,6 +84,14 @@ class MainActivity : AppCompatActivity() {
                 }
                 chkStatus.isChecked = true
             }
+        }
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun showConnectMessage(message: String?) = binding.apply {
+        runOnUiThread {
+            tvBtc.text = "Connect: $message"
+            chkStatus.isChecked = true
         }
     }
 

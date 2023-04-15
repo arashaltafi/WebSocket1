@@ -8,7 +8,7 @@ import java.util.concurrent.TimeUnit
 
 class WebSocketClient(
     private val url: String,
-    private val messageHandler: (String?, Boolean) -> Unit
+    private val messageHandler: (String?, STATUS) -> Unit
 ) {
 
     private lateinit var webSocket: WebSocket
@@ -28,12 +28,13 @@ class WebSocketClient(
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 super.onOpen(webSocket, response)
                 Log.i(TAG, "WebSocket connected to $url")
+                messageHandler(response.message, STATUS.CONNECTED)
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
                 super.onMessage(webSocket, text)
                 Log.i(TAG, "Received message: $text")
-                messageHandler(text, true)
+                messageHandler(text, STATUS.MESSAGING)
             }
 
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
@@ -54,7 +55,7 @@ class WebSocketClient(
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 super.onFailure(webSocket, t, response)
                 Log.i(TAG, "WebSocket failed: ${t.message}")
-                messageHandler(t.message, false)
+                messageHandler(t.message, STATUS.FAILED)
             }
         })
     }
@@ -69,5 +70,11 @@ class WebSocketClient(
 
     private companion object {
         const val TAG = "WebSocketClient"
+    }
+
+    enum class STATUS {
+        CONNECTED,
+        FAILED,
+        MESSAGING
     }
 }
